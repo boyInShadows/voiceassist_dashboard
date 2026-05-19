@@ -143,6 +143,12 @@ export function Nav() {
           <NavLink href="/calls" pathname={pathname}>
             Calls
           </NavLink>
+          <NavLink href="/analytics" pathname={pathname}>
+          Analytics
+          </NavLink>
+          <NavLink href="/sessions" pathname={pathname}>
+          Sessions
+          </NavLink>
           <NavLink href="/faqs" pathname={pathname}>
             FAQs
           </NavLink>

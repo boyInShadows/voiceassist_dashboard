@@ -7,17 +7,53 @@ import { ErrorCard } from "@/components/ui/ErrorCard";
 import { useAppointmentsStore } from "@/store/appointments";
 import { AppointmentsFiltersBar } from "./list/AppointmentsFiltersBar";
 import { AppointmentsTable } from "./list/AppointmentsTable";
+import { includesQuery } from "@/lib/search";
+import type { Appointment } from "@/lib/types";
+
+function read(obj: Record<string, unknown>, key: string): string {
+  const v = obj[key];
+  if (typeof v === "string" && v.trim()) return v.trim();
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  return "";
+}
+
+function apptSearchParts(a: Appointment): string[] {
+  const o = a as unknown as Record<string, unknown>;
+  return [
+    read(o, "id"),
+    read(o, "patient_name"),
+    read(o, "patient_phone"),
+    read(o, "department"),
+    read(o, "department_name"),
+    read(o, "provider_name"),
+    read(o, "doctor_name"),
+    read(o, "status"),
+    read(o, "appointment_date"),
+    read(o, "appointment_time"),
+    read(o, "scheduled_time"),
+    read(o, "reason_for_visit"),
+    read(o, "confirmation_code"),
+  ];
+}
 
 export default function AppointmentsPageClient() {
   const {
-    scope, setScope,
-    date, setDate,
-    status, setStatus,
-    q, setQuery,
-    limit, setLimit,
-    offset, setOffset,
-    rows, count,
-    loading, error,
+    scope,
+    setScope,
+    date,
+    setDate,
+    status,
+    setStatus,
+    q,
+    setQuery,
+    limit,
+    setLimit,
+    offset,
+    setOffset,
+    rows,
+    count,
+    loading,
+    error,
     refresh,
   } = useAppointmentsStore();
 
@@ -27,9 +63,9 @@ export default function AppointmentsPageClient() {
   }, [scope, date, status, limit, offset]);
 
   const filteredRows = useMemo(() => {
-    const t = q.trim().toLowerCase();
+    const t = q.trim();
     if (!t) return rows;
-    return rows.filter((a) => JSON.stringify(a).toLowerCase().includes(t));
+    return rows.filter((a) => includesQuery(apptSearchParts(a), t));
   }, [q, rows]);
 
   const hasPrev = offset > 0;

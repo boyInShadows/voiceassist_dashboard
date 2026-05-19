@@ -1,11 +1,11 @@
-// Path: components/patients/detail/PatientDetailClient.tsx
+// Path: components/patients/details/PatientDetailClient.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { ErrorCard } from "@/components/ui/ErrorCard";
-import { SkeletonText } from "@/components/ui/Skeleton";
 import { Card } from "@/components/ui/Card";
+import { SkeletonText } from "@/components/ui/Skeleton";
+import { ErrorCard } from "@/components/ui/ErrorCard";
 import { getPatient, updatePatient } from "@/lib/api/voiceAssistantApi";
 import type { Patient } from "@/lib/types";
 import { PatientProfileCard } from "./PatientProfileCard";
@@ -28,6 +28,22 @@ export type PatientPatchPayload = {
   notes?: string;
 };
 
+type HistoryItem = {
+  id: number;
+  appointment_date: string;
+  appointment_time: string;
+  duration_minutes: number;
+  appointment_type: string;
+  status: string;
+  reason_for_visit: string | null;
+  doctor_name: string | null;
+  doctor_title: string | null;
+  department_name: string | null;
+  location_name: string | null;
+  source: string | null;
+  confirmation_code: string | null;
+};
+
 function normalizeIntId(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const s = raw.trim();
@@ -43,8 +59,35 @@ function mergePatient(prev: Patient, next: Patient): Patient {
   return { ...(p as object), ...(n as object) } as Patient;
 }
 
+function mapHistoryFromPatient(patient: Patient): HistoryItem[] {
+  const p = patient as unknown as Record<string, unknown>;
+  const raw = p["appointments"] ?? p["history"];
+  const arr = Array.isArray(raw) ? raw : [];
+
+  return arr
+    .filter((x) => typeof x === "object" && x !== null)
+    .map((x) => x as Record<string, unknown>)
+    .map((x) => ({
+      id: Number(x.id),
+      appointment_date: String(x.appointment_date ?? ""),
+      appointment_time: String(x.appointment_time ?? ""),
+      duration_minutes: Number(x.duration_minutes ?? 0),
+      appointment_type: String(x.appointment_type ?? ""),
+      status: String(x.status ?? ""),
+      reason_for_visit: x.reason_for_visit == null ? null : String(x.reason_for_visit),
+      doctor_name: x.doctor_name == null ? null : String(x.doctor_name),
+      doctor_title: x.doctor_title == null ? null : String(x.doctor_title),
+      department_name: x.department_name == null ? null : String(x.department_name),
+      location_name: x.location_name == null ? null : String(x.location_name),
+      source: x.source == null ? null : String(x.source),
+      confirmation_code: x.confirmation_code == null ? null : String(x.confirmation_code),
+    }))
+    .filter((h) => Number.isFinite(h.id) && h.id > 0);
+}
+
 export default function PatientDetailClient() {
   const params = useParams();
+
   const rawId = useMemo(() => {
     const v = params?.id;
     return Array.isArray(v) ? v[0] : v;
@@ -57,15 +100,15 @@ export default function PatientDetailClient() {
   const [err, setErr] = useState<string | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
 
-  async function load(validId: string) {
+  async function load(validId: string): Promise<void> {
     setLoading(true);
     setErr(null);
     try {
       const res: ApiOne<Patient> = await getPatient(validId);
       setPatient(res.data);
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : String(e));
       setPatient(null);
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -74,19 +117,18 @@ export default function PatientDetailClient() {
   useEffect(() => {
     if (!idNorm) {
       setLoading(false);
-      setErr(`Invalid patient ID in URL. Raw: ${String(rawId ?? "null")}`);
       setPatient(null);
+      setErr(`Invalid patient ID in URL. Raw: ${String(rawId ?? "null")}`);
       return;
     }
     void load(idNorm);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idNorm]);
 
-  async function onSave(patch: PatientPatchPayload) {
+  async function onSave(patch: PatientPatchPayload): Promise<void> {
     if (!idNorm || !patient) return;
     setSaving(true);
     setErr(null);
-
     try {
       const res = await updatePatient(idNorm, patch as unknown as Partial<Patient>);
       setPatient((prev) => (prev ? mergePatient(prev, res.data) : res.data));
@@ -117,10 +159,12 @@ export default function PatientDetailClient() {
     );
   }
 
+  const mappedHistory = mapHistoryFromPatient(patient);
+
   return (
     <div className="space-y-4">
       <PatientProfileCard patient={patient} saving={saving} onSave={onSave} />
-      <PatientHistoryCard patient={patient} />
+      <PatientHistoryCard history={mappedHistory} />
     </div>
   );
 }

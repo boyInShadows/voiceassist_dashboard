@@ -1,13 +1,39 @@
 // Path: components/appointments/AppointmentsPageClient.tsx
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { SkeletonTable } from "@/components/ui/Skeleton";
-import { useAppointments } from "./hooks/useAppointments";
+import { ErrorCard } from "@/components/ui/ErrorCard";
+import { useAppointmentsStore } from "@/store/appointments";
 import { AppointmentsFiltersBar } from "./list/AppointmentsFiltersBar";
 import { AppointmentsTable } from "./list/AppointmentsTable";
 
 export default function AppointmentsPageClient() {
-  const s = useAppointments();
+  const {
+    scope, setScope,
+    date, setDate,
+    status, setStatus,
+    q, setQuery,
+    limit, setLimit,
+    offset, setOffset,
+    rows, count,
+    loading, error,
+    refresh,
+  } = useAppointmentsStore();
+
+  useEffect(() => {
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, date, status, limit, offset]);
+
+  const filteredRows = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return rows;
+    return rows.filter((a) => JSON.stringify(a).toLowerCase().includes(t));
+  }, [q, rows]);
+
+  const hasPrev = offset > 0;
+  const hasNext = offset + limit < count;
 
   return (
     <div className="space-y-4">
@@ -19,31 +45,29 @@ export default function AppointmentsPageClient() {
       </div>
 
       <AppointmentsFiltersBar
-        scope={s.scope}
-        setScope={s.setScope}
-        date={s.date}
-        setDate={s.setDate}
-        status={s.status}
-        setStatus={s.setStatus}
-        q={s.q}
-        setQ={s.setQ}
-        limit={s.limit}
-        setLimit={s.setLimit}
-        onRefresh={s.refresh}
-        showing={s.filteredRows.length}
-        total={s.count}
-        offset={s.offset}
-        hasPrev={s.hasPrev}
-        hasNext={s.hasNext}
-        onPrev={() => s.setOffset(s.offset - s.limit)}
-        onNext={() => s.setOffset(s.offset + s.limit)}
+        scope={scope}
+        setScope={setScope}
+        date={date}
+        setDate={setDate}
+        status={status}
+        setStatus={setStatus}
+        q={q}
+        setQ={setQuery}
+        limit={limit}
+        setLimit={setLimit}
+        onRefresh={refresh}
+        showing={filteredRows.length}
+        total={count}
+        offset={offset}
+        hasPrev={hasPrev}
+        hasNext={hasNext}
+        onPrev={() => setOffset(offset - limit)}
+        onNext={() => setOffset(offset + limit)}
       />
 
-      {s.error ? (
-        <div className="text-sm" style={{ color: "rgb(239,68,68)" }}>{s.error}</div>
-      ) : null}
+      {error ? <ErrorCard message={error} /> : null}
 
-      {s.loading ? <SkeletonTable rows={7} /> : <AppointmentsTable rows={s.filteredRows} />}
+      {loading ? <SkeletonTable rows={7} /> : <AppointmentsTable rows={filteredRows} />}
     </div>
   );
 }

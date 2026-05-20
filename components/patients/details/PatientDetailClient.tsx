@@ -2,8 +2,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { SkeletonText } from "@/components/ui/Skeleton";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { getPatient, updatePatient } from "@/lib/api/voiceAssistantApi";
@@ -74,18 +75,23 @@ function mapHistoryFromPatient(patient: Patient): HistoryItem[] {
       duration_minutes: Number(x.duration_minutes ?? 0),
       appointment_type: String(x.appointment_type ?? ""),
       status: String(x.status ?? ""),
-      reason_for_visit: x.reason_for_visit == null ? null : String(x.reason_for_visit),
+      reason_for_visit:
+        x.reason_for_visit == null ? null : String(x.reason_for_visit),
       doctor_name: x.doctor_name == null ? null : String(x.doctor_name),
       doctor_title: x.doctor_title == null ? null : String(x.doctor_title),
-      department_name: x.department_name == null ? null : String(x.department_name),
-      location_name: x.location_name == null ? null : String(x.location_name),
+      department_name:
+        x.department_name == null ? null : String(x.department_name),
+      location_name:
+        x.location_name == null ? null : String(x.location_name),
       source: x.source == null ? null : String(x.source),
-      confirmation_code: x.confirmation_code == null ? null : String(x.confirmation_code),
+      confirmation_code:
+        x.confirmation_code == null ? null : String(x.confirmation_code),
     }))
     .filter((h) => Number.isFinite(h.id) && h.id > 0);
 }
 
 export default function PatientDetailClient() {
+  const router = useRouter();
   const params = useParams();
 
   const rawId = useMemo(() => {
@@ -98,6 +104,7 @@ export default function PatientDetailClient() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
 
   async function load(validId: string): Promise<void> {
@@ -106,6 +113,7 @@ export default function PatientDetailClient() {
     try {
       const res: ApiOne<Patient> = await getPatient(validId);
       setPatient(res.data);
+      setNote(null);
     } catch (e: unknown) {
       setPatient(null);
       setErr(e instanceof Error ? e.message : String(e));
@@ -129,9 +137,14 @@ export default function PatientDetailClient() {
     if (!idNorm || !patient) return;
     setSaving(true);
     setErr(null);
+    setNote(null);
     try {
-      const res = await updatePatient(idNorm, patch as unknown as Partial<Patient>);
+      const res = await updatePatient(
+        idNorm,
+        patch as unknown as Partial<Patient>,
+      );
       setPatient((prev) => (prev ? mergePatient(prev, res.data) : res.data));
+      setNote("Saved.");
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -163,6 +176,34 @@ export default function PatientDetailClient() {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold">Patient #{idNorm ?? "—"}</h1>
+          <p className="text-sm" style={{ color: "rgb(var(--muted))" }}>
+            Profile and appointment history.
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={() => router.push("/patients")}>
+            Back
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => idNorm && void load(idNorm)}
+            disabled={!idNorm}
+          >
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {note ? (
+        <div className="text-sm" style={{ color: "rgb(var(--muted))" }}>
+          {note}
+        </div>
+      ) : null}
+
       <PatientProfileCard patient={patient} saving={saving} onSave={onSave} />
       <PatientHistoryCard history={mappedHistory} />
     </div>

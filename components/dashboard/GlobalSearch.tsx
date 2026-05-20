@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -58,7 +59,10 @@ function highlight(text: string, q: string): JSX.Element {
   return (
     <>
       {before}
-      <mark className="rounded px-1" style={{ background: "rgba(99,102,241,0.18)", color: "inherit" }}>
+      <mark
+        className="rounded px-1"
+        style={{ background: "rgba(99,102,241,0.18)", color: "inherit" }}
+      >
         {mid}
       </mark>
       {after}
@@ -100,7 +104,6 @@ function scoreFor(hay: string, q: string): number {
   const lower = hay.toLowerCase();
   let score = 0;
   if (lower.includes(t)) score += 10;
-  // boost exact token matches
   const tokens = t.split(/\s+/).filter(Boolean);
   for (const tok of tokens) {
     if (tok.length >= 2 && lower.includes(tok)) score += 2;
@@ -112,13 +115,25 @@ function groupCard(
   title: string,
   items: ResultItem[],
   q: string,
+  viewAllHref?: string,
 ): JSX.Element {
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between">
         <div className="font-semibold">{title}</div>
-        <div className="text-xs" style={{ color: "rgb(var(--muted))" }}>
-          {items.length}
+        <div className="flex items-center gap-2">
+          {viewAllHref ? (
+            <Link
+              href={viewAllHref}
+              className="text-xs underline underline-offset-2"
+              style={{ color: "rgb(var(--muted))" }}
+            >
+              View all
+            </Link>
+          ) : null}
+          <div className="text-xs" style={{ color: "rgb(var(--muted))" }}>
+            {items.length}
+          </div>
         </div>
       </div>
 
@@ -139,15 +154,23 @@ function groupCard(
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <Badge text={pillText(it.group)} tone={tone(it.group)} />
-                    <div className="font-medium truncate">{highlight(it.title, q)}</div>
+                    <div className="font-medium truncate">
+                      {highlight(it.title, q)}
+                    </div>
                   </div>
                   {it.subtitle ? (
-                    <div className="text-xs mt-1" style={{ color: "rgb(var(--muted))" }}>
+                    <div
+                      className="text-xs mt-1"
+                      style={{ color: "rgb(var(--muted))" }}
+                    >
                       {highlight(it.subtitle, q)}
                     </div>
                   ) : null}
                   {it.snippet ? (
-                    <div className="text-xs mt-1" style={{ color: "rgb(var(--muted))" }}>
+                    <div
+                      className="text-xs mt-1"
+                      style={{ color: "rgb(var(--muted))" }}
+                    >
                       {highlight(it.snippet, q)}
                     </div>
                   ) : null}
@@ -165,6 +188,9 @@ function groupCard(
 }
 
 export function GlobalSearch() {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const [q, setQ] = useState("");
   const qDebounced = useDebouncedValue(q, 250);
 
@@ -178,6 +204,49 @@ export function GlobalSearch() {
     patients: [],
     faqs: [],
   });
+
+  // Keyboard shortcuts:
+  //  - / focuses search
+  //  - Cmd/Ctrl+K focuses search
+  //  - Esc clears search (or blurs if already empty)
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const isMac = navigator.platform.toLowerCase().includes("mac");
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+
+      // ignore while typing in inputs/textareas unless it's Esc
+      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase();
+      const typing = tag === "input" || tag === "textarea" || (e.target as HTMLElement | null)?.isContentEditable;
+
+      if (e.key === "Escape") {
+        if (q.trim()) {
+          e.preventDefault();
+          setQ("");
+          setGroup("all");
+          inputRef.current?.focus();
+        } else {
+          inputRef.current?.blur();
+        }
+        return;
+      }
+
+      if (typing) return;
+
+      if (e.key === "/") {
+        e.preventDefault();
+        inputRef.current?.focus();
+        return;
+      }
+
+      if (mod && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [q]);
 
   useEffect(() => {
     const query = qDebounced.trim();
@@ -194,7 +263,6 @@ export function GlobalSearch() {
       setErr(null);
 
       try {
-        // Fetch small slices; filter client-side where no query API exists.
         const [apptRes, callsRes, faqsRes, patientsRes] = await Promise.all([
           backendGet<{ success?: boolean; data?: AnyObj[] }>(
             "/api/appointments?limit=120&offset=0",
@@ -222,9 +290,19 @@ export function GlobalSearch() {
         const apptItems = appts
           .map((o) => {
             const id = pickId(o, ["id", "appointment_id", "appointmentId"]);
-            const title = s(o.patient_name) || s(o.full_name) || `Appointment #${id || "—"}`;
-            const subtitle = [s(o.department_name) || s(o.department), s(o.doctor_name) || s(o.provider_name)].filter(Boolean).join(" • ");
-            const snippet = [s(o.reason_for_visit), s(o.status)].filter(Boolean).join(" • ");
+            const title =
+              s(o.patient_name) ||
+              s(o.full_name) ||
+              `Appointment #${id || "—"}`;
+            const subtitle = [
+              s(o.department_name) || s(o.department),
+              s(o.doctor_name) || s(o.provider_name),
+            ]
+              .filter(Boolean)
+              .join(" • ");
+            const snippet = [s(o.reason_for_visit), s(o.status)]
+              .filter(Boolean)
+              .join(" • ");
             const hay = `${title} ${subtitle} ${snippet} ${s(o.patient_phone)} ${s(o.confirmation_code)} ${s(o.appointment_date)} ${s(o.appointment_time)} ${s(o.scheduled_time)}`;
             return {
               score: scoreFor(hay, qn),
@@ -246,8 +324,12 @@ export function GlobalSearch() {
         const callItems = calls
           .map((o) => {
             const sid = pickId(o, ["callSid", "call_sid", "sid", "id"]);
-            const title = s(o.patient_name) ? `Call • ${s(o.patient_name)}` : `Call ${sid ? sid.slice(0, 6) : "—"}`;
-            const subtitle = [s(o.intent), s(o.status)].filter(Boolean).join(" • ");
+            const title = s(o.patient_name)
+              ? `Call • ${s(o.patient_name)}`
+              : `Call ${sid ? sid.slice(0, 6) : "—"}`;
+            const subtitle = [s(o.intent), s(o.status)]
+              .filter(Boolean)
+              .join(" • ");
             const snippet = s(o.summary) || s(o.problem) || "";
             const hay = `${title} ${subtitle} ${snippet} ${s(o.from_number)} ${s(o.to_number)} ${s(o.sentiment)}`;
             return {
@@ -270,10 +352,19 @@ export function GlobalSearch() {
         const faqItems = faqs
           .map((o) => {
             const id = pickId(o, ["id", "faq_id", "faqId"]);
-            const title = s(o.question_pattern) || s(o.questionPattern) || s(o.question) || "FAQ";
+            const title =
+              s(o.question_pattern) ||
+              s(o.questionPattern) ||
+              s(o.question) ||
+              "FAQ";
             const subtitle = s(o.category) || "";
-            const snippet = s(o.answer_short) || s(o.answerShort) || s(o.answer) || "";
-            const hay = `${title} ${subtitle} ${snippet} ${(o.question_variations || o.questionVariations || []).join(" ")}`;
+            const snippet =
+              s(o.answer_short) || s(o.answerShort) || s(o.answer) || "";
+            const variations =
+              (o.question_variations as string[] | undefined) ??
+              (o.questionVariations as string[] | undefined) ??
+              [];
+            const hay = `${title} ${subtitle} ${snippet} ${variations.join(" ")}`;
             return {
               score: scoreFor(hay, qn),
               item: {
@@ -294,8 +385,14 @@ export function GlobalSearch() {
         const patientItems = patients
           .map((o) => {
             const id = pickId(o, ["id", "patient_id", "patientId"]);
-            const title = s(o.full_name) || s(o.fullName) || s(o.name) || "Patient";
-            const subtitle = [s(o.phone) || s(o.phone_number), s(o.dob) || s(o.date_of_birth)].filter(Boolean).join(" • ");
+            const title =
+              s(o.full_name) || s(o.fullName) || s(o.name) || "Patient";
+            const subtitle = [
+              s(o.phone) || s(o.phone_number),
+              s(o.dob) || s(o.date_of_birth),
+            ]
+              .filter(Boolean)
+              .join(" • ");
             const hay = `${title} ${subtitle} ${s(o.email)} ${s(o.address)} ${s(o.insuranceProvider)}`;
             return {
               score: scoreFor(hay, qn),
@@ -346,13 +443,27 @@ export function GlobalSearch() {
     faqs: raw.faqs.length,
   };
 
+  const totalCount =
+    counts.appointments + counts.calls + counts.patients + counts.faqs;
+
   const visible = useMemo(() => {
-    if (group === "appointments") return { appointments: raw.appointments, calls: [], patients: [], faqs: [] };
-    if (group === "calls") return { appointments: [], calls: raw.calls, patients: [], faqs: [] };
-    if (group === "patients") return { appointments: [], calls: [], patients: raw.patients, faqs: [] };
-    if (group === "faqs") return { appointments: [], calls: [], patients: [], faqs: raw.faqs };
+    if (group === "appointments")
+      return { appointments: raw.appointments, calls: [], patients: [], faqs: [] };
+    if (group === "calls")
+      return { appointments: [], calls: raw.calls, patients: [], faqs: [] };
+    if (group === "patients")
+      return { appointments: [], calls: [], patients: raw.patients, faqs: [] };
+    if (group === "faqs")
+      return { appointments: [], calls: [], patients: [], faqs: raw.faqs };
     return raw;
   }, [group, raw]);
+
+  const viewAll = {
+    appointments: qDebounced.trim() ? `/appointments?search=${encodeURIComponent(qDebounced.trim())}` : "/appointments",
+    calls: qDebounced.trim() ? `/calls?search=${encodeURIComponent(qDebounced.trim())}` : "/calls",
+    patients: qDebounced.trim() ? `/patients?search=${encodeURIComponent(qDebounced.trim())}` : "/patients",
+    faqs: qDebounced.trim() ? `/faqs?search=${encodeURIComponent(qDebounced.trim())}` : "/faqs",
+  };
 
   return (
     <div className="space-y-3">
@@ -362,7 +473,8 @@ export function GlobalSearch() {
             <Input
               value={q}
               onChange={setQ}
-              placeholder="Search across appointments, calls, patients, FAQs…"
+              placeholder="Search across appointments, calls, patients, FAQs… (/, Ctrl+K)"
+              inputRef={inputRef}
             />
           </div>
 
@@ -371,7 +483,11 @@ export function GlobalSearch() {
           </Button>
 
           <div className="text-xs" style={{ color: "rgb(var(--muted))" }}>
-            {loading ? "Searching…" : qDebounced.trim().length < 2 ? "Type 2+ chars" : "Ready"}
+            {loading
+              ? "Searching…"
+              : qDebounced.trim().length < 2
+                ? "Type 2+ chars"
+                : "Ready"}
           </div>
         </div>
 
@@ -379,26 +495,68 @@ export function GlobalSearch() {
           {["all", "appointments", "calls", "patients", "faqs"].map((g) => {
             const gg = g as SearchGroup;
             const isActive = gg === group;
-            const label = gg === "all" ? "All" : groupLabel(gg as Exclude<SearchGroup, "all">);
-            const count = gg === "all" ? counts.appointments + counts.calls + counts.patients + counts.faqs : counts[gg as Exclude<SearchGroup, "all">];
+            const label =
+              gg === "all"
+                ? "All"
+                : groupLabel(gg as Exclude<SearchGroup, "all">);
+            const count =
+              gg === "all"
+                ? totalCount
+                : counts[gg as Exclude<SearchGroup, "all">];
             return (
               <button
                 key={g}
                 onClick={() => setGroup(gg)}
                 className="px-3 py-2 rounded-xl border text-sm"
                 style={{
-                  background: isActive ? "rgba(99,102,241,0.14)" : "rgb(var(--surface2))",
+                  background: isActive
+                    ? "rgba(99,102,241,0.14)"
+                    : "rgb(var(--surface2))",
                   borderColor: "rgb(var(--border))",
                   color: "rgb(var(--text))",
                 }}
               >
                 {label}
-                <span className="ml-2 text-xs" style={{ color: "rgb(var(--muted))" }}>
+                <span
+                  className="ml-2 text-xs"
+                  style={{ color: "rgb(var(--muted))" }}
+                >
                   {count}
                 </span>
               </button>
             );
           })}
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            variant="ghost"
+            disabled={qDebounced.trim().length < 2}
+            onClick={() => router.push(viewAll.appointments)}
+          >
+            View all appointments
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={qDebounced.trim().length < 2}
+            onClick={() => router.push(viewAll.calls)}
+          >
+            View all calls
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={qDebounced.trim().length < 2}
+            onClick={() => router.push(viewAll.patients)}
+          >
+            View all patients
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={qDebounced.trim().length < 2}
+            onClick={() => router.push(viewAll.faqs)}
+          >
+            View all FAQs
+          </Button>
         </div>
 
         {err ? (
@@ -407,7 +565,9 @@ export function GlobalSearch() {
           </div>
         ) : null}
 
-        {qDebounced.trim().length >= 2 && !loading && counts.appointments + counts.calls + counts.patients + counts.faqs === 0 ? (
+        {qDebounced.trim().length >= 2 &&
+        !loading &&
+        totalCount === 0 ? (
           <div className="mt-3 text-sm" style={{ color: "rgb(var(--muted))" }}>
             No results.
           </div>
@@ -417,16 +577,16 @@ export function GlobalSearch() {
       {qDebounced.trim().length >= 2 ? (
         <div className="grid lg:grid-cols-2 gap-3">
           {group === "all" || group === "appointments"
-            ? groupCard("Appointments", visible.appointments, qDebounced)
+            ? groupCard("Appointments", visible.appointments, qDebounced, viewAll.appointments)
             : null}
           {group === "all" || group === "calls"
-            ? groupCard("Calls", visible.calls, qDebounced)
+            ? groupCard("Calls", visible.calls, qDebounced, viewAll.calls)
             : null}
           {group === "all" || group === "patients"
-            ? groupCard("Patients", visible.patients, qDebounced)
+            ? groupCard("Patients", visible.patients, qDebounced, viewAll.patients)
             : null}
           {group === "all" || group === "faqs"
-            ? groupCard("FAQs", visible.faqs, qDebounced)
+            ? groupCard("FAQs", visible.faqs, qDebounced, viewAll.faqs)
             : null}
         </div>
       ) : null}

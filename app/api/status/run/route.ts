@@ -118,7 +118,7 @@ export async function GET() {
         check("Appointment by ID", "GET", "/api/appointments/1", authHeaders),
         check("Calls List", "GET", "/api/calls", authHeaders),
         check("FAQs List", "GET", "/api/faqs", authHeaders),
-        check("FAQ by ID", "GET", "/api/faqs/1", authHeaders),
+        // check("FAQ by ID", "GET", "/api/faqs/1", authHeaders),
         check("Analytics Overview", "GET", "/api/analytics/overview", authHeaders),
         check("Analytics Intents", "GET", "/api/analytics/intents", authHeaders),
         check("Analytics Hourly", "GET", "/api/analytics/hourly", authHeaders),

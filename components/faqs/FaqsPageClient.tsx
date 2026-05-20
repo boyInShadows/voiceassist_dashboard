@@ -2,6 +2,8 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import { useRef } from "react";
 import { Button } from "@/components/ui/Button";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { SkeletonTable } from "@/components/ui/Skeleton";
@@ -37,6 +39,17 @@ export default function FaqsPageClient() {
   } = useFaqsStore();
 
   const qDebounced = useDebouncedValue(q, 200);
+
+  const searchParams = useSearchParams();
+const appliedSearchParam = useRef(false);
+
+useEffect(() => {
+  if (appliedSearchParam.current) return;
+  const sp = searchParams.get("search")?.trim();
+  if (sp) setQuery(sp);
+  appliedSearchParam.current = true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [searchParams]);
 
   useEffect(() => {
     void refresh();

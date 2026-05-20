@@ -137,9 +137,9 @@ export function Nav() {
           <NavLink href="/patients" pathname={pathname}>
             Patients
           </NavLink>
-          <NavLink href="/appointments" pathname={pathname}>
+          {/* <NavLink href="/appointments" pathname={pathname}>
             Reservations
-          </NavLink>
+          </NavLink> */}
           <NavLink href="/calls" pathname={pathname}>
             Calls
           </NavLink>

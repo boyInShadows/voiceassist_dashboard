@@ -1,9 +1,10 @@
-// Path: components/calls/detail/CallDetailClient.tsx
+// Path: components/calls/details/CallDetailClient.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { SkeletonText } from "@/components/ui/Skeleton";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { backendGet, BackendError } from "@/lib/backend";
@@ -26,12 +27,15 @@ function unwrapCallEnvelope(x: unknown): CallLike {
 }
 
 export default function CallDetailClient() {
+  const router = useRouter();
   const params = useParams();
   const callSid = useMemo(() => pickParam(params?.callSid), [params]);
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [call, setCall] = useState<CallLike | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +43,7 @@ export default function CallDetailClient() {
     async function run() {
       setLoading(true);
       setErr(null);
-      setCall(null);
+      setNote(null);
 
       if (!callSid) {
         setErr("Invalid callSid in URL.");
@@ -48,15 +52,15 @@ export default function CallDetailClient() {
       }
 
       try {
-        // IMPORTANT: backend returns { success, data }
         const raw = await backendGet<unknown>(`/api/calls/${callSid}`);
         const unwrapped = unwrapCallEnvelope(raw);
         if (!cancelled) setCall(unwrapped);
+        if (!cancelled && reloadTick > 0) setNote("Refreshed.");
       } catch (e: unknown) {
         if (cancelled) return;
         const msg =
           e instanceof BackendError
-            ? `Call fetch failed: ${e.status}`
+            ? `Call fetch failed (${e.status})`
             : e instanceof Error
               ? e.message
               : "Call fetch failed";
@@ -70,7 +74,7 @@ export default function CallDetailClient() {
     return () => {
       cancelled = true;
     };
-  }, [callSid]);
+  }, [callSid, reloadTick]);
 
   if (loading) {
     return (
@@ -102,18 +106,30 @@ export default function CallDetailClient() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader title={`Call ${callSid}`} subtitle="Details and transcript." />
-      </Card>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold">Call {callSid}</h1>
+          <p className="text-sm" style={{ color: "rgb(var(--muted))" }}>
+            Details and transcript.
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={() => router.push("/calls")}>Back</Button>
+          <Button variant="primary" onClick={() => setReloadTick((n) => n + 1)}>
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {note ? (
+        <div className="text-sm" style={{ color: "rgb(var(--muted))" }}>
+          {note}
+        </div>
+      ) : null}
 
       <CallMetaCard call={call} />
       <CallTranscriptCard call={call} />
-
-      <Card className="p-4">
-        <div className="text-sm" style={{ color: "rgb(var(--muted))" }}>
-          Next: add Tool Calls + Errors panels if backend returns those fields.
-        </div>
-      </Card>
     </div>
   );
 }

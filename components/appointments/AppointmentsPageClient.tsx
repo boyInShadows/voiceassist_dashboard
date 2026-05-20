@@ -8,6 +8,7 @@ import { useAppointmentsStore } from "@/store/appointments";
 import { AppointmentsFiltersBar } from "./list/AppointmentsFiltersBar";
 import { AppointmentsTable } from "./list/AppointmentsTable";
 import { includesQuery } from "@/lib/search";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import type { Appointment } from "@/lib/types";
 
 function read(obj: Record<string, unknown>, key: string): string {
@@ -62,11 +63,13 @@ export default function AppointmentsPageClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, date, status, limit, offset]);
 
+  const qDebounced = useDebouncedValue(q, 200);
+
   const filteredRows = useMemo(() => {
-    const t = q.trim();
+    const t = qDebounced.trim();
     if (!t) return rows;
     return rows.filter((a) => includesQuery(apptSearchParts(a), t));
-  }, [q, rows]);
+  }, [qDebounced, rows]);
 
   const hasPrev = offset > 0;
   const hasNext = offset + limit < count;

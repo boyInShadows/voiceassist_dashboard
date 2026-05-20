@@ -1,27 +1,48 @@
 // Path: components/patients/PatientsPageClient.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { usePatientsStore } from "@/store/patients";
 import { PatientsFiltersBar } from "./list/PatientsFiltersBar";
 import { PatientsTable } from "./list/PatientsTable";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
 export default function PatientsPageClient() {
+  const searchParams = useSearchParams();
+  const appliedSearchParam = useRef(false);
+
   const {
-    q, setQuery,
-    limit, setLimit,
-    offset, setOffset,
-    rows, count,
-    loading, error,
+    q,
+    setQuery,
+    limit,
+    setLimit,
+    offset,
+    setOffset,
+    rows,
+    count,
+    loading,
+    error,
     refresh,
   } = usePatientsStore();
+
+  // Apply ?search= exactly once
+  useEffect(() => {
+    if (appliedSearchParam.current) return;
+    const sp = searchParams.get("search")?.trim();
+    if (sp) setQuery(sp);
+    appliedSearchParam.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const qDebounced = useDebouncedValue(q, 300);
 
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [limit, offset]);
+  }, [limit, offset, qDebounced]);
 
   const hasPrev = offset > 0;
   const hasNext = offset + limit < count;

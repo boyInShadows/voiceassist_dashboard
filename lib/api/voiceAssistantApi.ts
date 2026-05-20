@@ -17,6 +17,8 @@ import type {
   HourlyAnalytics,
   FaqItem,
   User,
+  ReservationListItem,
+  ReservationDetail,
 } from "../types";
 
 // ============ Health Check ============
@@ -51,6 +53,18 @@ export const updateAppointment = (id: string, data: Partial<Appointment>) =>
 export const deleteAppointment = (id: string) =>
   backendDelete<{ success: boolean; message?: string }>(
     `/api/appointments/${id}`,
+  );
+
+// ============ Reservations ============
+// GET /api/reservations
+export const getReservations = () =>
+  backendGet<{ success: boolean; data: ReservationListItem[]; count?: number }>(
+    `/api/reservations`,
+  );
+
+export const getReservation = (id: string | number) =>
+  backendGet<{ success: boolean; data: ReservationDetail }>(
+    `/api/reservations/${id}`,
   );
 
 // ============ Patients ============
@@ -130,22 +144,22 @@ export const createFaq = (payload: {
 }) =>
   backendPost<{ success: boolean; data: FaqItem }>(`/api/faqs`, payload);
 
-  export const updateFaq = (
-    id: string | number,
-    payload: {
-      questionPattern?: string;
-      questionVariations?: string[];
-      answer?: string;
-      answerShort?: string;
-      category?: string;
-      priority?: number;
-      isActive?: boolean;
-    },
-  ) =>
-    backendPatch<{ success: boolean; data: FaqItem }>(
-      `/api/faqs/${id}`,
-      payload,
-    );
+export const updateFaq = (
+  id: string | number,
+  payload: {
+    questionPattern?: string;
+    questionVariations?: string[];
+    answer?: string;
+    answerShort?: string;
+    category?: string;
+    priority?: number;
+    isActive?: boolean;
+  },
+) =>
+  backendPatch<{ success: boolean; data: FaqItem }>(
+    `/api/faqs/${id}`,
+    payload,
+  );
 
 export const deleteFaq = (id: string | number) =>
   backendDelete<{ success: boolean; message?: string }>(`/api/faqs/${id}`);

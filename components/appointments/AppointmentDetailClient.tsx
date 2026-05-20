@@ -111,13 +111,13 @@ export default function AppointmentDetailClient() {
     setNote(null);
 
     try {
-      const res = await updateAppointment(idNorm, { status } as Partial<Appointment>);
-      // Merge: keep patient name + other fields even if PATCH returns partial
+      const res = await updateAppointment(idNorm, {
+        status,
+      } as Partial<Appointment>);
+
       setAppt((prev) => (prev ? mergeAppointment(prev, res.data) : res.data));
       setStatus(appointmentStatus(res.data));
       setNote("Saved.");
-      // Optional: refetch to ensure server truth (uncomment if needed)
-      // await load(idNorm);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -149,15 +149,16 @@ export default function AppointmentDetailClient() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">
-            Appointment #{idNorm ?? "—"}
-          </h1>
+          <h1 className="text-xl font-semibold">Appointment #{idNorm ?? "—"}</h1>
           <p className="text-sm" style={{ color: "rgb(var(--muted))" }}>
             Review details and update status.
           </p>
         </div>
 
         <div className="flex gap-2">
+          <Button variant="ghost" onClick={() => router.push("/appointments")}>
+            Back
+          </Button>
           <Button
             variant="ghost"
             onClick={() => idNorm && void load(idNorm)}
@@ -198,7 +199,10 @@ export default function AppointmentDetailClient() {
                 <div className="text-lg font-semibold">
                   {field(appt, "patient_name")}
                 </div>
-                <div className="text-xs mt-1" style={{ color: "rgb(var(--muted))" }}>
+                <div
+                  className="text-xs mt-1"
+                  style={{ color: "rgb(var(--muted))" }}
+                >
                   Provider: {field(appt, "provider_name")} • Department:{" "}
                   {field(appt, "department")}
                 </div>

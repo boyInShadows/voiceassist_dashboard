@@ -1,12 +1,12 @@
 // Path: store/faqs.ts
 import { create } from "zustand";
 import {
-    getFaqs,
-    getFaqCategories,
-    createFaq,
-    updateFaq,
-    deleteFaq,
-  } from "@/lib/api/voiceAssistantApi";
+  getFaqs,
+  getFaqCategories,
+  createFaq,
+  updateFaq,
+  deleteFaq,
+} from "@/lib/api/voiceAssistantApi";
 import type { FaqItem } from "@/lib/types";
 
 type Store = {
@@ -18,6 +18,8 @@ type Store = {
 
   loading: boolean;
   error: string | null;
+  lastFetchedAt: number | null;
+  lastKey: string | null;
 
   modalOpen: boolean;
   editing: FaqItem | null;
@@ -34,8 +36,10 @@ type Store = {
   deactivate: (id: string | number) => Promise<void>;
 };
 
-function normalizeText(s: string): string {
-  return s.toLowerCase().trim();
+const CACHE_TTL_MS = 8000;
+
+function makeKey(category: string): string {
+  return `category=${category || ""}`;
 }
 
 export const useFaqsStore = create<Store>((set, get) => ({
@@ -47,6 +51,8 @@ export const useFaqsStore = create<Store>((set, get) => ({
 
   loading: false,
   error: null,
+  lastFetchedAt: null,
+  lastKey: null,
 
   modalOpen: false,
   editing: null,
@@ -59,28 +65,34 @@ export const useFaqsStore = create<Store>((set, get) => ({
   closeModal: () => set({ modalOpen: false }),
 
   refresh: async () => {
+    const { category, lastFetchedAt, lastKey } = get();
+    const key = makeKey(category);
+
+    if (lastFetchedAt && lastKey === key && Date.now() - lastFetchedAt < CACHE_TTL_MS) {
+      return;
+    }
+
+    // stale-while-refresh: keep rows while fetching
     set({ loading: true, error: null });
     try {
-      const { category } = get();
       const [listRes, catRes] = await Promise.all([
         getFaqs(category ? { category } : undefined),
         getFaqCategories(),
       ]);
 
-      const rows = listRes.data;
-      const categories = catRes.data;
-
       set({
-        rows,
-        categories,
+        rows: listRes.data,
+        categories: catRes.data,
         loading: false,
         error: null,
+        lastFetchedAt: Date.now(),
+        lastKey: key,
       });
     } catch (e: unknown) {
+      // keep existing rows on error
       set({
         loading: false,
         error: e instanceof Error ? e.message : String(e),
-        rows: [],
       });
     }
   },
@@ -91,14 +103,21 @@ export const useFaqsStore = create<Store>((set, get) => ({
 
     try {
       if (editing) {
-        await updateFaq(editing.id as string, payload);
-      } else {
-        await createFaq({
-          question: payload.question,
+        await updateFaq(editing.id as string, {
+          questionPattern: payload.question,
           answer: payload.answer,
           category: payload.category,
-          active: true,
-        } as unknown as Omit<FaqItem, "id">);
+          isActive: true,
+        });
+      } else {
+        await createFaq({
+          questionPattern: payload.question,
+          answer: payload.answer,
+          answerShort: payload.answer.length > 140 ? `${payload.answer.slice(0, 137)}…` : payload.answer,
+          category: payload.category,
+          priority: 50,
+          isActive: true,
+        });
       }
       set({ modalOpen: false, editing: null });
       await get().refresh();

@@ -1,7 +1,8 @@
 // Path: components/appointments/AppointmentsPageClient.tsx
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { useAppointmentsStore } from "@/store/appointments";
@@ -38,6 +39,9 @@ function apptSearchParts(a: Appointment): string[] {
 }
 
 export default function AppointmentsPageClient() {
+  const searchParams = useSearchParams();
+  const appliedSearchParam = useRef(false);
+
   const {
     scope,
     setScope,
@@ -57,6 +61,17 @@ export default function AppointmentsPageClient() {
     error,
     refresh,
   } = useAppointmentsStore();
+
+  // Apply ?search= exactly once (so it doesn't fight user typing)
+  useEffect(() => {
+    if (appliedSearchParam.current) return;
+    const sp = searchParams.get("search")?.trim();
+    if (sp) {
+      setQuery(sp);
+    }
+    appliedSearchParam.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     void refresh();
@@ -106,7 +121,11 @@ export default function AppointmentsPageClient() {
 
       {error ? <ErrorCard message={error} /> : null}
 
-      {loading ? <SkeletonTable rows={7} /> : <AppointmentsTable rows={filteredRows} />}
+      {loading ? (
+        <SkeletonTable rows={7} />
+      ) : (
+        <AppointmentsTable rows={filteredRows} />
+      )}
     </div>
   );
 }

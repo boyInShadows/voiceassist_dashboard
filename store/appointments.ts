@@ -22,6 +22,7 @@ type Store = {
   loading: boolean;
   error: string | null;
   lastFetchedAt: number | null;
+  lastKey: string | null;
 
   // Actions
   setScope: (v: DateScope) => void;
@@ -34,8 +35,14 @@ type Store = {
   refresh: () => Promise<void>;
 };
 
+const CACHE_TTL_MS = 8000;
+
 function clampOffset(n: number): number {
   return n < 0 ? 0 : n;
+}
+
+function makeKey(scope: DateScope, date: string, status: string, limit: number, offset: number): string {
+  return `scope=${scope}|date=${date}|status=${status}|limit=${limit}|offset=${offset}`;
 }
 
 export const useAppointmentsStore = create<Store>((set, get) => ({
@@ -51,6 +58,7 @@ export const useAppointmentsStore = create<Store>((set, get) => ({
   loading: false,
   error: null,
   lastFetchedAt: null,
+  lastKey: null,
 
   setScope: (v) => set({ scope: v, offset: 0 }),
   setDate: (v) => set({ date: v, offset: 0 }),
@@ -63,8 +71,20 @@ export const useAppointmentsStore = create<Store>((set, get) => ({
     const s = get();
 
     const dateParam =
-      s.scope === "all" ? undefined : s.scope === "today" ? todayISO() : s.date || undefined;
+      s.scope === "all"
+        ? undefined
+        : s.scope === "today"
+          ? todayISO()
+          : s.date || undefined;
 
+    const key = makeKey(s.scope, dateParam ?? "", s.status || "", s.limit, s.offset);
+
+    // Light caching: skip if same query key fetched recently
+    if (s.lastFetchedAt && s.lastKey === key && Date.now() - s.lastFetchedAt < CACHE_TTL_MS) {
+      return;
+    }
+
+    // Stale-while-refresh: keep existing rows while loading
     set({ loading: true, error: null });
 
     try {
@@ -81,13 +101,13 @@ export const useAppointmentsStore = create<Store>((set, get) => ({
         loading: false,
         error: null,
         lastFetchedAt: Date.now(),
+        lastKey: key,
       });
     } catch (e: unknown) {
+      // Keep existing rows/count on error
       set({
         loading: false,
         error: e instanceof Error ? e.message : String(e),
-        rows: [],
-        count: 0,
       });
     }
   },

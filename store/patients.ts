@@ -13,6 +13,7 @@ type Store = {
   loading: boolean;
   error: string | null;
   lastFetchedAt: number | null;
+  lastKey: string | null;
 
   setQuery: (v: string) => void;
   setLimit: (n: number) => void;
@@ -21,8 +22,14 @@ type Store = {
   refresh: () => Promise<void>;
 };
 
+const CACHE_TTL_MS = 8000;
+
 function clampOffset(n: number): number {
   return n < 0 ? 0 : n;
+}
+
+function makeKey(q: string, limit: number, offset: number): string {
+  return `q=${q.trim()}|limit=${limit}|offset=${offset}`;
 }
 
 export const usePatientsStore = create<Store>((set, get) => ({
@@ -35,6 +42,7 @@ export const usePatientsStore = create<Store>((set, get) => ({
   loading: false,
   error: null,
   lastFetchedAt: null,
+  lastKey: null,
 
   setQuery: (v) => set({ q: v, offset: 0 }),
   setLimit: (n) => set({ limit: n, offset: 0 }),
@@ -42,6 +50,13 @@ export const usePatientsStore = create<Store>((set, get) => ({
 
   refresh: async () => {
     const s = get();
+    const key = makeKey(s.q, s.limit, s.offset);
+
+    if (s.lastFetchedAt && s.lastKey === key && Date.now() - s.lastFetchedAt < CACHE_TTL_MS) {
+      return;
+    }
+
+    // Stale-while-refresh: keep existing rows
     set({ loading: true, error: null });
     try {
       const res = await searchPatients({
@@ -55,13 +70,13 @@ export const usePatientsStore = create<Store>((set, get) => ({
         loading: false,
         error: null,
         lastFetchedAt: Date.now(),
+        lastKey: key,
       });
     } catch (e: unknown) {
+      // Keep existing rows/count
       set({
         loading: false,
         error: e instanceof Error ? e.message : String(e),
-        rows: [],
-        count: 0,
       });
     }
   },

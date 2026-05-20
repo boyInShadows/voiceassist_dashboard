@@ -10,6 +10,7 @@ import { FaqsFiltersBar } from "./list/FaqsFiltersBar";
 import { FaqsTable } from "./list/FaqsTable";
 import { FaqEditorModal } from "./editor/FaqEditorModal";
 import type { FaqItem } from "@/lib/types";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
 function norm(s: string): string {
   return s.toLowerCase().trim();
@@ -35,19 +36,21 @@ export default function FaqsPageClient() {
     deactivate,
   } = useFaqsStore();
 
+  const qDebounced = useDebouncedValue(q, 200);
+
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filtered = useMemo(() => {
-    const t = norm(q);
-    if (!t) return rows;
+    const t = norm(qDebounced);
+        if (!t) return rows;
     return rows.filter((f: FaqItem) => {
       const hay = `${f.question} ${f.answer} ${f.category ?? ""}`.toLowerCase();
       return hay.includes(t);
     });
-  }, [q, rows]);
+  }, [qDebounced, rows]);
 
   return (
     <div className="space-y-4">

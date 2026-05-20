@@ -8,6 +8,7 @@ import { useCallsStore } from "@/store/calls";
 import { CallsFiltersBar } from "./list/CallsFiltersBar";
 import { CallsTable } from "./list/CallsTable";
 import { includesQuery } from "@/lib/search";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
 type CallLike = Record<string, unknown>;
 
@@ -38,16 +39,18 @@ export default function CallsPageClient() {
     refresh,
   } = useCallsStore();
 
+  const qDebounced = useDebouncedValue(q, 200);
+
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [limit, offset]);
 
   const filteredRows = useMemo(() => {
-    const t = q.trim();
-    if (!t) return rows;
+    const t = qDebounced.trim();
+        if (!t) return rows;
     return rows.filter((c) => includesQuery(callSearchParts(c), t));
-  }, [q, rows]);
+  }, [qDebounced, rows]);
 
   const hasPrev = offset > 0;
   const hasNext = offset + limit < count;

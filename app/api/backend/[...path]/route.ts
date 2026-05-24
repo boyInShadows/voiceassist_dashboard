@@ -1,50 +1,91 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const BASE = process.env.BACKEND_BASE_URL?.replace(/\/$/, "");
+const TOKEN_COOKIE = "auth-token";
+
+const PUBLIC_PROXY_ROUTES = new Set(["auth/login", "auth/setup"]);
+
+function isPublicProxyPath(parts: string[]): boolean {
+  return PUBLIC_PROXY_ROUTES.has(parts.join("/"));
+}
+
+function buildForwardHeaders(req: NextRequest, token: string | undefined): Headers {
+  const headers = new Headers();
+
+  const contentType = req.headers.get("content-type");
+  if (contentType) headers.set("content-type", contentType);
+
+  const accept = req.headers.get("accept");
+  if (accept) headers.set("accept", accept);
+
+  if (token) headers.set("authorization", `Bearer ${token}`);
+
+  return headers;
+}
+
+function buildResponseHeaders(upstream: Response): Headers {
+  const headers = new Headers();
+
+  const contentType = upstream.headers.get("content-type");
+  if (contentType) headers.set("content-type", contentType);
+
+  const cacheControl = upstream.headers.get("cache-control");
+  if (cacheControl) headers.set("cache-control", cacheControl);
+
+  return headers;
+}
 
 async function handler(
   req: NextRequest,
-  // The compiler in your specific Next.js version requires the 'params' object to be a Promise.
-  // We will now handle it as a Promise and 'await' it.
-  { params: paramsPromise }: { params: Promise<{ path: string[] }> }
+  { params: paramsPromise }: { params: Promise<{ path: string[] }> },
 ) {
   try {
-    // Await the promise to get the actual params object
     const params = await paramsPromise;
 
-    if (!BASE) return NextResponse.json({ error: "BACKEND_BASE_URL not set" }, { status: 500 });
+    if (!BASE) {
+      return NextResponse.json(
+        { error: "BACKEND_BASE_URL not set" },
+        { status: 500 },
+      );
+    }
 
     const parts = params.path ?? [];
-    const target = new URL(`${BASE}/${parts.join("/")}`);
 
-    if ((params.path?.[0] ?? "") === "__whoami") {
-      return NextResponse.json({
-        BACKEND_BASE_URL: BASE,
-        forwardedPath: (params.path ?? []).join("/"),
-        forwardedUrl: target.toString(),
-      });
+    // Do not expose debug environment info through the proxy.
+    if (parts[0] === "__whoami") {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+
+    const cookieToken = req.cookies.get(TOKEN_COOKIE)?.value;
+
+    if (!isPublicProxyPath(parts) && !cookieToken) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const target = new URL(`${BASE}/${parts.join("/")}`);
     req.nextUrl.searchParams.forEach((v, k) => target.searchParams.set(k, v));
 
     const method = req.method.toUpperCase();
-    const headers = new Headers(req.headers);
-    headers.delete("host");
-    headers.delete("connection");
-    headers.delete("content-length");
-
-    // Important: forward raw body
+    const headers = buildForwardHeaders(req, cookieToken);
     const body = ["GET", "HEAD"].includes(method) ? undefined : await req.arrayBuffer();
 
-    const upstream = await fetch(target, { method, headers, body, cache: "no-store" });
+    const upstream = await fetch(target, {
+      method,
+      headers,
+      body,
+      cache: "no-store",
+    });
 
-    const outHeaders = new Headers(upstream.headers);
-    outHeaders.delete("content-encoding");
-
-    return new NextResponse(upstream.body, { status: upstream.status, headers: outHeaders });
+    return new NextResponse(upstream.body, {
+      status: upstream.status,
+      headers: buildResponseHeaders(upstream),
+    });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    // return NextResponse.json({ error: "Proxy error", details: msg }, { status: 500 });
-    return NextResponse.json({ PROXY_FILE: "app/api/backend/[...path]/route.ts", ok: true, error: msg });
+    return NextResponse.json(
+      { error: "Proxy error", details: msg },
+      { status: 502 },
+    );
   }
 }
 

@@ -3,10 +3,22 @@ import { NextRequest, NextResponse } from "next/server";
 const BASE = process.env.BACKEND_BASE_URL?.replace(/\/$/, "");
 const TOKEN_COOKIE = "auth-token";
 
-const PUBLIC_PROXY_ROUTES = new Set(["auth/login", "auth/setup"]);
+const PUBLIC_PROXY_ROUTES = new Set([
+  "auth/login",
+  "auth/setup",
+  "auth/register",
+]);
 
 function isPublicProxyPath(parts: string[]): boolean {
   return PUBLIC_PROXY_ROUTES.has(parts.join("/"));
+}
+
+function isLoginPath(parts: string[]): boolean {
+  return parts.join("/") === "auth/login";
+}
+
+function isLogoutPath(parts: string[]): boolean {
+  return parts.join("/") === "auth/logout";
 }
 
 function buildForwardHeaders(req: NextRequest, token: string | undefined): Headers {
@@ -33,6 +45,43 @@ function buildResponseHeaders(upstream: Response): Headers {
   if (cacheControl) headers.set("cache-control", cacheControl);
 
   return headers;
+}
+
+type JsonObject = Record<string, unknown>;
+
+function readTokenFromLoginPayload(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+
+  const root = payload as JsonObject;
+  const data = root.data && typeof root.data === "object"
+    ? (root.data as JsonObject)
+    : null;
+
+  const token =
+    (typeof root.token === "string" ? root.token : null) ??
+    (data && typeof data.token === "string" ? data.token : null);
+
+  return token && token.trim() ? token.trim() : null;
+}
+
+function setAuthCookie(res: NextResponse, token: string): void {
+  res.cookies.set(TOKEN_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 8,
+  });
+}
+
+function clearAuthCookie(res: NextResponse): void {
+  res.cookies.set(TOKEN_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
 }
 
 async function handler(
@@ -67,7 +116,9 @@ async function handler(
 
     const method = req.method.toUpperCase();
     const headers = buildForwardHeaders(req, cookieToken);
-    const body = ["GET", "HEAD"].includes(method) ? undefined : await req.arrayBuffer();
+    const body = ["GET", "HEAD"].includes(method)
+      ? undefined
+      : await req.arrayBuffer();
 
     const upstream = await fetch(target, {
       method,
@@ -76,9 +127,40 @@ async function handler(
       cache: "no-store",
     });
 
+    const outHeaders = buildResponseHeaders(upstream);
+
+    // Login needs special handling so the browser receives a secure HttpOnly cookie.
+    if (isLoginPath(parts)) {
+      const contentType = upstream.headers.get("content-type") || "";
+
+      if (contentType.includes("application/json")) {
+        const json = await upstream.json().catch(() => null);
+        const res = NextResponse.json(json, {
+          status: upstream.status,
+          headers: outHeaders,
+        });
+
+        if (upstream.ok) {
+          const token = readTokenFromLoginPayload(json);
+          if (token) setAuthCookie(res, token);
+        }
+
+        return res;
+      }
+    }
+
+    if (isLogoutPath(parts)) {
+      const res = new NextResponse(upstream.body, {
+        status: upstream.status,
+        headers: outHeaders,
+      });
+      clearAuthCookie(res);
+      return res;
+    }
+
     return new NextResponse(upstream.body, {
       status: upstream.status,
-      headers: buildResponseHeaders(upstream),
+      headers: outHeaders,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

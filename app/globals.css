@@ -138,6 +138,73 @@ textarea:focus-visible,
   background: rgb(var(--muted));
 }
 
+/* ============================================================
+   Claymorphism — landing page surface kit
+   Soft, inflated "clay" panels that still read in the dashboard's
+   violet language. Everything is driven by CSS vars so a single
+   element can be tinted via inline style: { ['--clay-tint']: '139 92 246' }.
+   Light/dark only differ in the highlight + carve insets.
+   ============================================================ */
+:root {
+  --clay-tint: 139 92 246;            /* default violet, overridden per tile */
+  --clay-hl: rgba(255, 255, 255, 0.72); /* top-left puffy highlight */
+  --clay-carve: rgba(31, 38, 68, 0.16); /* bottom-right carved edge */
+  --clay-drop: 0.26;                  /* outer tinted drop-shadow alpha */
+}
+html.dark {
+  --clay-hl: rgba(255, 255, 255, 0.06);
+  --clay-carve: rgba(0, 0, 0, 0.5);
+  --clay-drop: 0.4;
+}
+
+/* Big puffy panel — the signature 3-shadow recipe */
+.clay {
+  border-radius: 34px;
+  background: rgb(var(--surface));
+  box-shadow:
+    22px 26px 50px rgb(var(--clay-tint) / var(--clay-drop)),
+    inset -7px -8px 16px var(--clay-carve),
+    inset 9px 11px 22px var(--clay-hl);
+}
+/* Smaller radius variant for pills / badges */
+.clay-sm {
+  border-radius: 22px;
+  background: rgb(var(--surface));
+  box-shadow:
+    12px 14px 28px rgb(var(--clay-tint) / calc(var(--clay-drop) * 0.85)),
+    inset -5px -6px 12px var(--clay-carve),
+    inset 6px 7px 16px var(--clay-hl);
+}
+/* A solid tinted clay blob (icon badges, the voice orb) */
+.clay-blob {
+  border-radius: 28px;
+  background: rgb(var(--clay-tint));
+  box-shadow:
+    16px 18px 36px rgb(var(--clay-tint) / 0.45),
+    inset -6px -8px 14px rgb(0 0 0 / 0.2),
+    inset 7px 9px 18px rgb(255 255 255 / 0.45);
+}
+/* Interactive press — squish the clay on hover/active */
+.clay-press {
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+.clay-press:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    26px 32px 60px rgb(var(--clay-tint) / calc(var(--clay-drop) + 0.06)),
+    inset -7px -8px 16px var(--clay-carve),
+    inset 9px 11px 22px var(--clay-hl);
+}
+.clay-press:active {
+  transform: translateY(-1px) scale(0.985);
+  box-shadow:
+    10px 12px 24px rgb(var(--clay-tint) / var(--clay-drop)),
+    inset -8px -9px 18px var(--clay-carve),
+    inset 5px 6px 14px var(--clay-hl);
+}
+
 /* ---- motion preferences ----------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   *,

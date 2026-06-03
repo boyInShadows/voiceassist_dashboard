@@ -19,6 +19,9 @@ module.exports = {
         muted: withOpacity("--muted"),
         accent: withOpacity("--accent"),
         accent2: withOpacity("--accent2"),
+        // claymorphism surfaces (landing)
+        "clay-bg": withOpacity("--clay-bg"),
+        "clay-surface": withOpacity("--clay-surface"),
       },
       borderColor: {
         DEFAULT: withOpacity("--border"),
@@ -30,44 +33,30 @@ module.exports = {
       borderRadius: {
         xl: "14px",
         "2xl": "18px",
-        clay: "34px",
-        "clay-lg": "44px",
+        "clay-sm": "var(--clay-radius-sm)",
+        clay: "var(--clay-radius)",
+        "clay-lg": "var(--clay-radius-lg)",
       },
       boxShadow: {
         sm: "var(--shadow-sm)",
         md: "var(--shadow-md)",
+        clay: "var(--clay-shadow)",
+        "clay-hover": "var(--clay-shadow-hover)",
+        "clay-pressed": "var(--clay-shadow-pressed)",
       },
       keyframes: {
         "fade-in": {
           "0%": { opacity: "0", transform: "translateY(4px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
-        // gentle ambient bobbing for clay blobs
-        float: {
-          "0%, 100%": { transform: "translateY(0) rotate(0deg)" },
-          "50%": { transform: "translateY(-16px) rotate(2deg)" },
-        },
-        "float-slow": {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-26px)" },
-        },
-        // expanding "incoming call" rings around the voice orb
-        "ping-ring": {
-          "0%": { transform: "scale(0.85)", opacity: "0.6" },
-          "100%": { transform: "scale(1.6)", opacity: "0" },
-        },
-        // soft sheen sweeping across clay panels
-        shimmer: {
-          "0%": { backgroundPosition: "-200% 0" },
-          "100%": { backgroundPosition: "200% 0" },
+        equalize: {
+          "0%, 100%": { transform: "scaleY(0.35)" },
+          "50%": { transform: "scaleY(1)" },
         },
       },
       animation: {
         "fade-in": "fade-in 0.25s ease both",
-        float: "float 6s ease-in-out infinite",
-        "float-slow": "float-slow 9s ease-in-out infinite",
-        "ping-ring": "ping-ring 2.6s ease-out infinite",
-        shimmer: "shimmer 6s linear infinite",
+        equalize: "equalize 1.1s ease-in-out infinite",
       },
     },
   },

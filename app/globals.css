@@ -31,10 +31,12 @@
 
   --radius: 16px;
 
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono",
-    Menlo, Consolas, "Liberation Mono", monospace;
+  /* next/font (layout.tsx) injects --font-inter / --font-jbmono; these stacks
+     fall back to the system equivalents if the webfont hasn't painted yet. */
+  --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-jbmono), "JetBrains Mono", ui-monospace,
+    SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 html.dark {
@@ -84,6 +86,10 @@ body::before {
     rgba(var(--accent), 0.07),
     transparent 60%
   );
+  /* promote to its own compositor layer so a fixed gradient never
+     triggers a repaint as content scrolls over it */
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 /* tabular figures for data so columns don't jitter */
@@ -139,70 +145,63 @@ textarea:focus-visible,
 }
 
 /* ============================================================
-   Claymorphism — landing page surface kit
-   Soft, inflated "clay" panels that still read in the dashboard's
-   violet language. Everything is driven by CSS vars so a single
-   element can be tinted via inline style: { ['--clay-tint']: '139 92 246' }.
-   Light/dark only differ in the highlight + carve insets.
+   Claymorphism kit (landing) — tuned, premium soft UI.
+   Re-derived from the dashboard's cool/violet tokens. Dark mode is a
+   separate derivation (NOT an inversion): surface sits ABOVE the bg, the
+   top highlight is faint, the underside is stronger, plus a light-catching
+   rim. One Tailwind class per token (shadow-clay / rounded-clay / bg-clay-*)
+   adapts across modes with no per-mode markup. See design-tokens.md §6.
    ============================================================ */
 :root {
-  --clay-tint: 139 92 246;            /* default violet, overridden per tile */
-  --clay-hl: rgba(255, 255, 255, 0.72); /* top-left puffy highlight */
-  --clay-carve: rgba(31, 38, 68, 0.16); /* bottom-right carved edge */
-  --clay-drop: 0.26;                  /* outer tinted drop-shadow alpha */
-}
-html.dark {
-  --clay-hl: rgba(255, 255, 255, 0.06);
-  --clay-carve: rgba(0, 0, 0, 0.5);
-  --clay-drop: 0.4;
+  --clay-bg: 237 239 243;            /* #EDEFF3 page bg — a touch below the surface */
+  --clay-surface: 252 253 254;       /* #FCFDFE matte near-white (not pure #FFF) */
+  --clay-border: rgba(16, 18, 27, 0.05);
+
+  --clay-radius-sm: 18px;
+  --clay-radius: 28px;
+  --clay-radius-lg: 36px;
+
+  --clay-shadow:
+    0 14px 30px -10px rgba(31, 41, 55, 0.12),   /* outer lift */
+    inset 0 2px 3px rgba(255, 255, 255, 0.90),  /* bright top highlight */
+    inset 0 -8px 14px -4px rgba(31, 41, 55, 0.06); /* underside curve */
+  --clay-shadow-hover:
+    0 22px 44px -12px rgba(31, 41, 55, 0.16),
+    inset 0 2px 3px rgba(255, 255, 255, 0.90),
+    inset 0 -8px 14px -4px rgba(31, 41, 55, 0.06);
+  --clay-shadow-pressed:                          /* flat: lift gone, inner bottom deepened */
+    0 2px 6px -2px rgba(31, 41, 55, 0.10),
+    inset 0 1px 2px rgba(255, 255, 255, 0.60),
+    inset 0 -2px 6px rgba(31, 41, 55, 0.12);
 }
 
-/* Big puffy panel — the signature 3-shadow recipe */
-.clay {
-  border-radius: 34px;
-  background: rgb(var(--surface));
-  box-shadow:
-    22px 26px 50px rgb(var(--clay-tint) / var(--clay-drop)),
-    inset -7px -8px 16px var(--clay-carve),
-    inset 9px 11px 22px var(--clay-hl);
+html.dark {
+  --clay-bg: 15 17 22;               /* #0F1116 — clearly below the surface */
+  --clay-surface: 28 31 38;          /* #1C1F26 — dashboard surface, LIFTED above bg */
+  --clay-border: rgba(255, 255, 255, 0.06); /* soft rim that catches light */
+
+  --clay-shadow:
+    0 18px 38px -12px rgba(0, 0, 0, 0.60),       /* outer depth on dark */
+    inset 0 1px 1px rgba(255, 255, 255, 0.05),   /* FAINT top highlight */
+    inset 0 -8px 16px -4px rgba(0, 0, 0, 0.45);  /* STRONGER underside */
+  --clay-shadow-hover:
+    0 26px 52px -14px rgba(0, 0, 0, 0.66),
+    inset 0 1px 1px rgba(255, 255, 255, 0.05),
+    inset 0 -8px 16px -4px rgba(0, 0, 0, 0.45);
+  --clay-shadow-pressed:
+    0 2px 8px -3px rgba(0, 0, 0, 0.50),
+    inset 0 1px 1px rgba(255, 255, 255, 0.04),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.50);
 }
-/* Smaller radius variant for pills / badges */
-.clay-sm {
-  border-radius: 22px;
-  background: rgb(var(--surface));
-  box-shadow:
-    12px 14px 28px rgb(var(--clay-tint) / calc(var(--clay-drop) * 0.85)),
-    inset -5px -6px 12px var(--clay-carve),
-    inset 6px 7px 16px var(--clay-hl);
-}
-/* A solid tinted clay blob (icon badges, the voice orb) */
-.clay-blob {
-  border-radius: 28px;
-  background: rgb(var(--clay-tint));
-  box-shadow:
-    16px 18px 36px rgb(var(--clay-tint) / 0.45),
-    inset -6px -8px 14px rgb(0 0 0 / 0.2),
-    inset 7px 9px 18px rgb(255 255 255 / 0.45);
-}
-/* Interactive press — squish the clay on hover/active */
+
+/* Baseline CSS press feedback (the JS layer adds the magnetic/scale polish).
+   Kept tiny so it survives even without GSAP; reduced-motion neutralises it. */
 .clay-press {
-  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
-  will-change: transform;
-}
-.clay-press:hover {
-  transform: translateY(-6px);
-  box-shadow:
-    26px 32px 60px rgb(var(--clay-tint) / calc(var(--clay-drop) + 0.06)),
-    inset -7px -8px 16px var(--clay-carve),
-    inset 9px 11px 22px var(--clay-hl);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 .clay-press:active {
-  transform: translateY(-1px) scale(0.985);
-  box-shadow:
-    10px 12px 24px rgb(var(--clay-tint) / var(--clay-drop)),
-    inset -8px -9px 18px var(--clay-carve),
-    inset 5px 6px 14px var(--clay-hl);
+  transform: scale(0.97);
+  box-shadow: var(--clay-shadow-pressed);
 }
 
 /* ---- motion preferences ----------------------------------- */

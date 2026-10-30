@@ -9,10 +9,10 @@
 ## How the app is shaped (the basics)
 
 - **Framework:** Next.js 16 (App Router) + React 19 + Tailwind. Pages live in `app/`, reusable pieces in `components/`, page state in `store/` (Zustand), and helpers in `lib/`.
-- **Login wall:** Every page sits behind a login. The sidebar (`components/nav.tsx`) is hidden on `/login` and `/signup`. `components/AppShell.tsx` wraps everything and loads your saved login on startup.
-- **How data is fetched:** Pages call the backend through one wrapper (`lib/backend.ts`). Every request goes through a proxy route at `/api/backend/...`. You attach a login token automatically.
-- **Live vs. mock data:** A switch (`DATA_SOURCE` / `NEXT_PUBLIC_DATA_SOURCE`) decides whether the app talks to the real backend (default) or to fake in-memory data (`lib/mock-data.ts`). Right now it uses the **real backend**.
-- **Theme:** Light/dark theme + sidebar state are remembered in your browser (`store/ui.ts`).
+- **Login wall:** The public marketing page (`/`) and auth screens are open; dashboard pages redirect unauthenticated visitors to login. The sidebar (`components/nav.tsx`) is hidden on `/`, `/login` and `/signup`. `components/AppShell.tsx` wraps everything and loads your saved login on startup.
+- **How data is fetched:** Pages call the backend through one wrapper (`lib/backend.ts`). Every request goes through a proxy route at `/api/backend/...`. The browser sends an HttpOnly session cookie; the server proxy forwards its token as a bearer header.
+- **Live vs. mock data:** The default is the separate backend. `DATA_SOURCE` / `NEXT_PUBLIC_DATA_SOURCE=mock` changes helper path normalization, but the proxy still forwards to `BACKEND_BASE_URL`; it does not automatically select the bundled mock routes or mock authentication. `NEXT_PUBLIC_LOG_SOURCE=mock` selects only the scripted activity feed.
+- **Theme:** The active theme is applied to the root element and saved in browser storage by `components/themeToggle.tsx`.
 
 ---
 
@@ -25,7 +25,7 @@ Email + password form. If you are already logged in, it sends you to the dashboa
 Creates the **very first** admin account (only works when no users exist yet). Used once to set up the system.
 
 ### 📊 Dashboard — `/dashboard`
-Your landing page after login. Shows overview numbers (total calls, appointments, transfers, errors) plus "Top Intents" and "Busy Hours" tables. Also hosts the **Global Search** box.
+Your landing page after login. Shows overview numbers (total calls, appointments, transfers, errors), quick section links and recent calls/appointments. Also hosts the **Global Search** box.
 
 ### 🔎 Global Search (on the dashboard)
 One search box that looks across appointments, calls, patients, and FAQs at the same time. Results are grouped by type with a "View all" link for each.

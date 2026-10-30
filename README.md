@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NeuroSpine voice-assistant dashboard
 
-## Getting Started
+A Next.js operations frontend for reviewing calls, appointments, patients,
+analytics and activity from a separately operated clinic voice-assistant API.
+This repository includes the dashboard, login/setup screens and a marketing
+landing page; the Express API and voice runtime are separate projects.
 
-First, run the development server:
+![Running dashboard with browser-intercepted synthetic responses](docs/artifacts/showcase/dashboard-fixture.png)
 
-```bash
+**Status and evidence:** these captures show the real local production frontend
+with synthetic responses supplied by a browser fixture. Counts, patient/caller
+labels and the reviewer account are examples. They do not establish a live
+clinic deployment, successful phone calls or verified production integrations.
+Marketing-page adoption, performance and compliance claims are unverified.
+
+## What is implemented here
+
+- Dashboard overview, recent calls/appointments and search across operational data.
+- Pages for patients, appointments, call details, analytics, FAQs, sessions and users.
+- Live activity UI with SSE, polling fallback and a scripted demo-feed option.
+- Light/dark themes and browser-local UI preferences.
+- A same-origin API proxy. Login responses supply an HttpOnly cookie; the proxy
+  forwards it as a bearer token and forwards abort signals for streamed requests.
+  Protected proxy calls without a cookie are rejected before reaching the backend.
+  The backend must still validate tokens and enforce permissions.
+
+The [proxy](app/api/backend/[...path]/route.ts),
+[API helper](lib/backend.ts) and [activity source factory](lib/logs/sources.ts)
+show these boundaries. Frontend and voice/backend contributions should be
+reviewed separately; existing Git history and credits are retained.
+
+## Run locally
+
+Verified on Windows with Node.js 24.11.1 and npm 11.6.2. The lockfile pins
+Next.js 16.1.6 and React 19.2.3; the UI uses TypeScript, Tailwind CSS 3, GSAP and
+Zustand. Google font downloads require network access during the build.
+
+```sh
+git clone https://github.com/boyInShadows/voiceassist_dashboard.git
+cd voiceassist_dashboard
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open <http://localhost:3000> for the public landing page. Dashboard access
+redirects to login. The default backend address is `http://localhost:4001`;
+set the server-side `BACKEND_BASE_URL` environment variable before starting
+Next.js if your separately provisioned development API uses another address.
+Use a disposable backend account and synthetic records. No backend credentials,
+database or telephony services are included here; keep secrets out of project files.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```sh
+npm run lint
+npm run typecheck
+npm run build
+npm start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Mock mode is partial.** `NEXT_PUBLIC_DATA_SOURCE=mock` changes client API path
+normalization, but does not switch the proxy to the bundled `/api/mock` routes
+or provide mock authentication. It is not a complete backend-free dashboard.
+`NEXT_PUBLIC_LOG_SOURCE=mock` selects the scripted activity feed only. Public
+`NEXT_PUBLIC_*` values are embedded at build time and must never contain secrets.
 
-## Learn More
+![Same synthetic dashboard in dark mode](docs/artifacts/showcase/dashboard-dark.png)
 
-To learn more about Next.js, take a look at the following resources:
+## Verified limits
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+On 2026-10-30, a clean locked install, typecheck and production build passed.
+Lint exited zero with six existing warnings; build reported the deprecated
+middleware convention and old Browserslist data. Browser checks verified the
+unauthenticated redirect, a real protected-proxy 401, then dashboard rendering
+and theme switching with intercepted synthetic login/data responses. Those
+intercepted requests do not verify real backend login, persistence, SSE or
+voice/provider integrations. There is no frontend test script or hosted quality CI.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Mobile dashboard usability, full role enforcement and a complete security or
+accessibility audit remain unverified. A dated npm audit reported 16 dependency
+advisories (1 critical, 11 high, 3 moderate, 1 low); dependencies were not upgraded.
+The existing capability guide is linked
+in [FRONTEND_CAPABILITIES.md](FRONTEND_CAPABILITIES.md); its broader page coverage
+is separate from this bounded verification. Existing ownership and asset rights
+remain unchanged; no license or certification is assigned by this README.
